@@ -59,7 +59,8 @@ Open the solution in Visual Studio and build the solution.
 
 ## Credits
 
-**Created by**: Tian-Qing Ye  (email: tqye2006@gmail.com)
+**Created by**: Tian-Qing Ye (email: tqye2006@gmail.com)
+
 **AI Assistant**: Claude Sonnet 4.5  
 **Date**: November 25, 2025  
 **Qt Version**: 5.15.2  
