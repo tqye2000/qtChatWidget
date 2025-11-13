@@ -5,6 +5,7 @@
  * When      | Who           | What
  * ----------|---------------|------------------------------------------------------
  * 25/10/2025| Tian-Qing Ye  | Created with assistance of Claude Sonnet 4.5
+ * 13/11/2025| Tian-Qing Ye  | Added new chat and export buttons and slot functions
  */
 #ifndef QT_CHATWIDGET_H
 #define QT_CHATWIDGET_H
@@ -129,8 +130,16 @@ signals:
 	 */
 	void messageSent(const QString& message);
 
+	//! Emitted when the user requests to export chat history
+	void exportRequested();
+
+	//! brief Emitted when the user starts a new conversation
+	void newConversationRequested();
+
 private slots:
 	void onSendButtonClicked();
+	void onNewButtonClicked();
+	void onExportButtonClicked();
 
 private:
 	Q_DISABLE_COPY(uiChatWidget)
@@ -145,6 +154,8 @@ private:
 	QTextEdit* _chatHistoryDisplay;
 	QLineEdit* _chatInputBox;
 	QPushButton* _sendButton;
+	QPushButton* _newButton;
+	QPushButton* _exportButton;
 	QProgressBar* _progressBar;
 
 	//! Create and setup the UI

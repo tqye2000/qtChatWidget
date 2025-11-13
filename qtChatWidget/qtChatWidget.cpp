@@ -5,6 +5,7 @@
  * When      | Who            | What
  * ----------|----------------|------------------------------------------------
  * 25/10/2025| Tian-Qing Ye   | Created with assistance of Claude Sonnet 4.5
+ * 13/11/2025| Tian-Qing Ye   | Added new chat and export buttons and slot functions
  */
 #include "qtChatWidget.h"
 #include <QVBoxLayout>
@@ -21,6 +22,10 @@
 #include <QTextCharFormat>
 #include <QBrush>
 #include <QColor>
+#include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
+#include <QMessageBox>
 
 uiChatWidget::uiChatWidget(const QString& title, const QString& welcomeMsg, int maxContextMessages, QWidget* parent)
 	: QWidget(parent)
@@ -28,6 +33,8 @@ uiChatWidget::uiChatWidget(const QString& title, const QString& welcomeMsg, int 
 	, _chatHistoryDisplay(nullptr)
 	, _chatInputBox(nullptr)
 	, _sendButton(nullptr)
+	, _newButton(nullptr)
+	, _exportButton(nullptr)
 	, _progressBar(nullptr)
 {
 	// Create the UI
@@ -51,13 +58,70 @@ void uiChatWidget::createUI(const QString& title)
 	QVBoxLayout* mainLayout = new QVBoxLayout;
 	setLayout(mainLayout);
 
+	// Header Container with Title and Buttons
+	QWidget* headerContainer = new QWidget(this);
+	QHBoxLayout* headerLayout = new QHBoxLayout;
+	headerContainer->setLayout(headerLayout);
+	headerLayout->setContentsMargins(0, 0, 0, 5);
+
 	// Title/Instructions Label
 	if (title.isEmpty() == false)
 	{
 		QLabel* titleLabel = new QLabel(title, this);
 		titleLabel->setStyleSheet("font-weight: bold; font-size: 11pt; padding: 5px;");
-		mainLayout->addWidget(titleLabel);
+		headerLayout->addWidget(titleLabel);
 	}
+
+	// Spacer
+	headerLayout->addStretch();
+
+	// New Button
+	_newButton = new QPushButton("New", headerContainer);
+	_newButton->setStyleSheet(
+		"QPushButton { "
+		"   background-color: #f3f2f1; "
+		"   color: #323130; "
+		"   border: 1px solid #8a8886; "
+		"   border-radius: 4px; "
+		"   padding: 6px 16px; "
+		"   font-size: 9pt; "
+		"} "
+		"QPushButton:hover { "
+		"   background-color: #e1dfdd; "
+		"   border-color: #605e5c; "
+		"} "
+		"QPushButton:pressed { "
+		"   background-color: #d2d0ce; "
+		"}"
+	);
+	_newButton->setCursor(Qt::PointingHandCursor);
+	_newButton->setToolTip("Start a new conversation");
+	headerLayout->addWidget(_newButton);
+
+	// Export Button
+	_exportButton = new QPushButton("Export", headerContainer);
+	_exportButton->setStyleSheet(
+		"QPushButton { "
+		"   background-color: #f3f2f1; "
+		"   color: #323130; "
+		"   border: 1px solid #8a8886; "
+		"   border-radius: 4px; "
+		"   padding: 6px 16px; "
+		"   font-size: 9pt; "
+		"} "
+		"QPushButton:hover { "
+		"   background-color: #e1dfdd; "
+		"   border-color: #605e5c; "
+		"} "
+		"QPushButton:pressed { "
+		"   background-color: #d2d0ce; "
+		"}"
+	);
+	_exportButton->setCursor(Qt::PointingHandCursor);
+	_exportButton->setToolTip("Export chat history to file");
+	headerLayout->addWidget(_exportButton);
+
+	mainLayout->addWidget(headerContainer);
 
 	// Chat History Display Area
 	_chatHistoryDisplay = new QTextEdit(this);
@@ -151,6 +215,8 @@ void uiChatWidget::createUI(const QString& title)
 	// Connect signals
 	connect(_chatInputBox, &QLineEdit::returnPressed, this, &uiChatWidget::onSendButtonClicked);
 	connect(_sendButton, &QPushButton::clicked, this, &uiChatWidget::onSendButtonClicked);
+	connect(_newButton, &QPushButton::clicked, this, &uiChatWidget::onNewButtonClicked);
+	connect(_exportButton, &QPushButton::clicked, this, &uiChatWidget::onExportButtonClicked);
 }
 
 QString uiChatWidget::senderToRole(const QString& sender) const
@@ -398,4 +464,80 @@ void uiChatWidget::ClearChatHistory()
 	// Add welcome message back
 	AppendChatMessage("System", "Welcome! I'm your AI assistant. How can I help you today?");
 	AppendChatMessage("System", QString("Note: The assistant will remember up to %1 recent messages for context.").arg(_maxContextMessages));
+}
+
+void uiChatWidget::onNewButtonClicked()
+{
+	// Ask for confirmation before clearing
+	QMessageBox::StandardButton reply;
+	reply = QMessageBox::question(this, "New Conversation",
+		"Are you sure you want to start a new conversation? Current chat history will be cleared.",
+		QMessageBox::Yes | QMessageBox::No);
+
+	if (reply == QMessageBox::Yes)
+	{
+		// Clear the chat history
+		ClearChatHistory();
+
+		// Emit signal to notify parent
+		emit newConversationRequested();
+	}
+}
+
+void uiChatWidget::onExportButtonClicked()
+{
+	if (_chatHistory.isEmpty())
+	{
+		QMessageBox::information(this, "Export Chat", "No chat history to export.");
+		return;
+	}
+
+	// Open file dialog to select save location
+	QString defaultFileName = QString("chat_export_%1.txt")
+		.arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+
+	QString fileName = QFileDialog::getSaveFileName(this,
+		"Export Chat History",
+		defaultFileName,
+		"Text Files (*.txt);;All Files (*)");
+
+	if (fileName.isEmpty())
+	{
+		return; // User cancelled
+	}
+
+	// Write chat history to file
+	QFile file(fileName);
+	if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+	{
+		QMessageBox::critical(this, "Export Error",
+			QString("Failed to open file for writing:\n%1").arg(fileName));
+		return;
+	}
+
+	QTextStream out(&file);
+	out.setCodec("UTF-8"); // Ensure UTF-8 encoding
+
+	// Write header
+	out << "========================================\n";
+	out << "Chat History Export\n";
+	out << "Exported: " << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n";
+	out << "Total Messages: " << _chatHistory.size() << "\n";
+	out << "========================================\n\n";
+
+	// Write each message
+	for (const ChatMessage& msg : _chatHistory)
+	{
+		out << "[" << msg.timestamp << "] " << msg.sender << ":\n";
+		out << msg.message << "\n\n";
+	}
+
+	file.close();
+
+	// Notify user of success
+	QMessageBox::information(this, "Export Complete",
+		QString("Chat history exported successfully to:\n%1").arg(fileName));
+
+	// Emit signal to notify parent
+	emit exportRequested();
 }
