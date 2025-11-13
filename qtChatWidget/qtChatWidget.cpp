@@ -20,6 +20,8 @@
 #include <QApplication>
 #include <QTextCursor>
 #include <QTextCharFormat>
+#include <QTextDocument>
+#include <QTextDocumentFragment>
 #include <QBrush>
 #include <QColor>
 #include <QFileDialog>
@@ -268,28 +270,19 @@ void uiChatWidget::AppendChatMessage(const QString& sender, const QString& messa
 	// Format timestamp for display (time only)
 	QString displayTime = timestamp.mid(11, 8); // Extract "hh:mm:ss"
 
-	// Set format based on sender
+	// Set format based on sender for the header line
 	QTextCharFormat senderFormat;
-	QTextCharFormat messageFormat;
+	senderFormat.setFontWeight(QFont::Bold);
 
 	if (sender == "You") {
-		senderFormat.setFontWeight(QFont::Bold);
 		senderFormat.setForeground(QBrush(QColor("#0078d4")));
 	}
 	else if (sender == "Assistant" || sender == "Bot") {
-		senderFormat.setFontWeight(QFont::Bold);
 		senderFormat.setForeground(QBrush(QColor("#107c10")));
 	}
 	else if (sender == "System") {
-		senderFormat.setFontWeight(QFont::Bold);
 		senderFormat.setForeground(QBrush(QColor("#605e5c")));
-		messageFormat.setFontItalic(true);
 	}
-	else {
-		senderFormat.setFontWeight(QFont::Bold);
-	}
-
-	messageFormat.setForeground(QBrush(QColor("#323130")));
 
 	// Add separator if not the first message
 	if (!_chatHistoryDisplay->toPlainText().isEmpty()) {
@@ -300,9 +293,29 @@ void uiChatWidget::AppendChatMessage(const QString& sender, const QString& messa
 	cursor.setCharFormat(senderFormat);
 	cursor.insertText(QString("[%1] %2:\n").arg(displayTime).arg(sender));
 
-	// Insert message
-	cursor.setCharFormat(messageFormat);
-	cursor.insertText(message + "\n");
+	// Reset format and render message as Markdown
+	QTextCharFormat defaultFormat;
+	defaultFormat.setForeground(QBrush(QColor("#323130")));
+	
+	// For system messages, apply italic style
+	if (sender == "System") {
+		defaultFormat.setFontItalic(true);
+	}
+	
+	cursor.setCharFormat(defaultFormat);
+	
+	// Insert Markdown-formatted message using QTextDocument fragment
+	QTextDocument tempDoc;
+	tempDoc.setDefaultFont(_chatHistoryDisplay->font());
+	tempDoc.setMarkdown(message);
+	
+	// Merge the markdown document into the chat display
+	QTextCursor tempCursor(&tempDoc);
+	tempCursor.select(QTextCursor::Document);
+	QTextDocumentFragment fragment = tempCursor.selection();
+	cursor.insertFragment(fragment);
+	
+	cursor.insertText("\n");
 
 	// Scroll to bottom
 	_chatHistoryDisplay->verticalScrollBar()->setValue(_chatHistoryDisplay->verticalScrollBar()->maximum());
@@ -323,28 +336,19 @@ void uiChatWidget::SetChatHistory(const QList<ChatMessage>& history)
 			// Extract time from timestamp
 			QString displayTime = msg.timestamp.mid(11, 8);
 
-			// Set format based on sender
+			// Set format based on sender for the header line
 			QTextCharFormat senderFormat;
-			QTextCharFormat messageFormat;
+			senderFormat.setFontWeight(QFont::Bold);
 
 			if (msg.sender == "You") {
-				senderFormat.setFontWeight(QFont::Bold);
 				senderFormat.setForeground(QBrush(QColor("#0078d4")));
 			}
 			else if (msg.sender == "Assistant" || msg.sender == "Bot") {
-				senderFormat.setFontWeight(QFont::Bold);
 				senderFormat.setForeground(QBrush(QColor("#107c10")));
 			}
 			else if (msg.sender == "System") {
-				senderFormat.setFontWeight(QFont::Bold);
 				senderFormat.setForeground(QBrush(QColor("#605e5c")));
-				messageFormat.setFontItalic(true);
 			}
-			else {
-				senderFormat.setFontWeight(QFont::Bold);
-			}
-
-			messageFormat.setForeground(QBrush(QColor("#323130")));
 
 			// Add separator
 			if (!_chatHistoryDisplay->toPlainText().isEmpty()) {
@@ -355,9 +359,29 @@ void uiChatWidget::SetChatHistory(const QList<ChatMessage>& history)
 			cursor.setCharFormat(senderFormat);
 			cursor.insertText(QString("[%1] %2:\n").arg(displayTime).arg(msg.sender));
 
-			// Insert message
-			cursor.setCharFormat(messageFormat);
-			cursor.insertText(msg.message + "\n");
+			// Reset format and render message as Markdown
+			QTextCharFormat defaultFormat;
+			defaultFormat.setForeground(QBrush(QColor("#323130")));
+			
+			// For system messages, apply italic style
+			if (msg.sender == "System") {
+				defaultFormat.setFontItalic(true);
+			}
+			
+			cursor.setCharFormat(defaultFormat);
+			
+			// Insert Markdown-formatted message using QTextDocument fragment
+			QTextDocument tempDoc;
+			tempDoc.setDefaultFont(_chatHistoryDisplay->font());
+			tempDoc.setMarkdown(msg.message);
+			
+			// Merge the markdown document into the chat display
+			QTextCursor tempCursor(&tempDoc);
+			tempCursor.select(QTextCursor::Document);
+			QTextDocumentFragment fragment = tempCursor.selection();
+			cursor.insertFragment(fragment);
+			
+			cursor.insertText("\n");
 		}
 
 		// Scroll to bottom
